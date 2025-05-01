@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using TaskManagerApi.Background;
+using TaskManagerApi.BackgroundJobs;
 using TaskManagerApi.Data;
-using TaskManagerApi.Seedwork;
+using TaskManagerApi.Seeding;
 using TaskManagerApi.Services;
 using TaskManagerApi.Services.Abstractions;
 

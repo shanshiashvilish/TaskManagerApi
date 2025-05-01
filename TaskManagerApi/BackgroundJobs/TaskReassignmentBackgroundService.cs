@@ -1,19 +1,19 @@
 using TaskManagerApi.Services.Abstractions;
 
-namespace TaskManagerApi.Background;
+namespace TaskManagerApi.BackgroundJobs;
 
 public class TaskReassignmentBackgroundService(IServiceScopeFactory scopeFactory) : BackgroundService
 {
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested)
         {
             using var scope = scopeFactory.CreateScope();
             var taskService = scope.ServiceProvider.GetRequiredService<ITaskService>();
 
-            // implement logic in taskService
+            await taskService.ReassignTasksAsync();
 
-            await Task.Delay(TimeSpan.FromMinutes(2), cancellationToken);
+            await Task.Delay(TimeSpan.FromMinutes(2), stoppingToken);
         }
     }
 }

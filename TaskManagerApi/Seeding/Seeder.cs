@@ -1,11 +1,21 @@
 using TaskManagerApi.Data;
 using TaskManagerApi.Models;
 
-namespace TaskManagerApi.Seedwork;
+namespace TaskManagerApi.Seeding;
 
 public class Seeder(AppDbContext db)
 {
     public void Seed()
+    {
+        AddUsers();
+        AddTasks();
+
+        db.SaveChanges();
+    }
+
+    #region Users
+
+    private void AddUsers()
     {
         if (!db.Users.Any())
         {
@@ -16,7 +26,10 @@ public class Seeder(AppDbContext db)
                 new User { Name = "Anna" },
                 new User { Name = "Bob" });
         }
+    }
 
+    private void AddTasks()
+    {
         if (!db.Tasks.Any())
         {
             db.Tasks.AddRange(
@@ -26,7 +39,7 @@ public class Seeder(AppDbContext db)
                 new TaskItem { Title = "Delete unused files" },
                 new TaskItem { Title = "Clean up models" });
         }
-
-        db.SaveChanges();
     }
+
+    #endregion
 }

@@ -9,6 +9,11 @@ namespace TaskManagerApi.Services;
 
 public class TaskService(AppDbContext dbContext) : ITaskService
 {
+    public Task ReassignTasksAsync()
+    {
+        throw new NotImplementedException();
+    }
+
     public async Task<TaskItem> CreateAsync(CreateTaskDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.Title))
@@ -28,8 +33,12 @@ public class TaskService(AppDbContext dbContext) : ITaskService
         if (allUsers.Count != 0)
         {
             var chosenUserId = await GetUserIdForNewTaskAsync(allUsers);
-            task.AssignedUserId = chosenUserId;
-            task.State = TaskState.InProgress;
+
+            if (chosenUserId != Guid.Empty)
+            {
+                task.AssignedUserId = chosenUserId;
+                task.State = TaskState.InProgress;
+            }
         }
 
         dbContext.Tasks.Add(task);
@@ -64,25 +73,14 @@ public class TaskService(AppDbContext dbContext) : ITaskService
         // Dictionary for quick access
         var taskCountLookup = taskCountsByUsers.ToDictionary(t => t.UserId, t => t.Count);
 
-        // Try to find users with 0 tasks
+        // Find users with 0 tasks
         var usersWithZeroTasks = allUsers
             .Where(u => !taskCountLookup.ContainsKey(u.Id))
             .ToList();
 
-        if (usersWithZeroTasks.Count != 0)
-        {
-            // Pick random from users with zero tasks
-            return usersWithZeroTasks.OrderBy(_ => Guid.NewGuid()).First().Id;
-        }
-
-        // Find the user(s) with the fewest tasks
-        var minTaskCount = taskCountLookup.Min(x => x.Value);
-
-        var usersWithMinTasks = allUsers
-            .Where(u => taskCountLookup.TryGetValue(u.Id, out var count) && count == minTaskCount)
-            .ToList();
-
-        return usersWithMinTasks.OrderBy(_ => Guid.NewGuid()).First().Id;
+        return usersWithZeroTasks.Count > 0
+            ? usersWithZeroTasks.OrderBy(_ => Guid.NewGuid()).First().Id // Pick random from users with zero tasks
+            : Guid.Empty;
     }
 
     #endregion
