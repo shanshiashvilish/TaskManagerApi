@@ -7,7 +7,7 @@ using TaskManagerApi.Services.Abstractions;
 
 namespace TaskManagerApi.Services;
 
-public class TaskService(AppDbContext dbContext, IUserService userService) : ITaskService
+public class TaskService(AppDbContext dbContext, IUserService userService, ILogger<TaskService> logger) : ITaskService
 {
     public async Task<TaskItem> CreateAsync(CreateTaskDto dto)
     {
@@ -28,12 +28,15 @@ public class TaskService(AppDbContext dbContext, IUserService userService) : ITa
             if (chosenUserId != Guid.Empty)
             {
                 AssignTask(task, chosenUserId);
+                logger.LogInformation("Task '{Title}' assigned to user {UserId} on creation.", dto.Title, chosenUserId);
             }
         }
 
         dbContext.Tasks.Add(task);
         await dbContext.SaveChangesAsync();
 
+        logger.LogInformation("Task '{Title}' created with ID: {TaskId}", dto.Title, task.Id);
+        
         return task;
     }
 
@@ -59,6 +62,7 @@ public class TaskService(AppDbContext dbContext, IUserService userService) : ITa
             if (assignedToAll)
             {
                 UnassignTask(task, TaskState.Completed);
+                logger.LogInformation("Task '{TaskId}' marked as Completed. All users had it assigned.", task.Id);
                 continue;
             }
 
@@ -69,11 +73,13 @@ public class TaskService(AppDbContext dbContext, IUserService userService) : ITa
             if (eligibleUsers.Count == 0)
             {
                 UnassignTask(task, TaskState.Waiting);
+                logger.LogInformation("Task '{TaskId}' left unassigned due to no eligible users.", task.Id);
                 continue;
             }
 
             var newUser = eligibleUsers.OrderBy(_ => Guid.NewGuid()).First();
             AssignTask(task, newUser.Id);
+            logger.LogInformation("Task '{TaskId}' reassigned to user {UserId}.", task.Id, newUser.Id);
         }
 
         await dbContext.SaveChangesAsync();

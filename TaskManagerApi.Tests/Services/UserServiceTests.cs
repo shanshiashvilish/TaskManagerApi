@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using TaskManagerApi.Data;
 using TaskManagerApi.DTOs;
 using TaskManagerApi.Models;
@@ -8,6 +9,8 @@ namespace TaskManagerApi.Tests.Services;
 
 public class UserServiceTests
 {
+    private static ILogger<T> GetMockLogger<T>() => new Moq.Mock<ILogger<T>>().Object;
+
     private static AppDbContext GetInMemoryContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -22,7 +25,8 @@ public class UserServiceTests
     {
         // Arrange
         var db = GetInMemoryContext();
-        var service = new UserService(db);
+        var logger = GetMockLogger<UserService>();
+        var service = new UserService(db, logger);
         var dto = new CreateUserDto { Name = "UniqueUser" };
 
         // Act
@@ -41,7 +45,8 @@ public class UserServiceTests
         db.Users.Add(new User { Name = "DuplicateUser" });
         await db.SaveChangesAsync();
 
-        var service = new UserService(db);
+        var logger = GetMockLogger<UserService>();
+        var service = new UserService(db, logger);
         var dto = new CreateUserDto { Name = "DuplicateUser" };
 
         // Act & Assert
@@ -53,7 +58,8 @@ public class UserServiceTests
     {
         // Arrange
         var db = GetInMemoryContext();
-        var service = new UserService(db);
+        var logger = GetMockLogger<UserService>();
+        var service = new UserService(db, logger);
         var dto = new CreateUserDto { Name = "" };
 
         // Act & Assert
@@ -71,8 +77,8 @@ public class UserServiceTests
         );
         await db.SaveChangesAsync();
 
-        var service = new UserService(db);
-
+        var logger = GetMockLogger<UserService>();
+        var service = new UserService(db, logger);
         // Act
         var users = await service.GetAllAsync();
 

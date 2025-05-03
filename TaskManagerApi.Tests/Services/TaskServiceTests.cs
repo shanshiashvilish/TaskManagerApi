@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Moq;
 using TaskManagerApi.Data;
 using TaskManagerApi.DTOs;
@@ -11,6 +12,8 @@ namespace TaskManagerApi.Tests.Services;
 
 public class TaskServiceTests
 {
+    private static ILogger<T> GetMockLogger<T>() => new Mock<ILogger<T>>().Object;
+
     private static AppDbContext GetInMemoryContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -36,7 +39,8 @@ public class TaskServiceTests
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        var service = new TaskService(db, GetMockUserService([user]));
+        var logger = GetMockLogger<TaskService>();
+        var service = new TaskService(db, GetMockUserService([user]), logger);
 
         // Act
         var task = await service.CreateAsync(new CreateTaskDto { Title = "Task 1" });
@@ -50,7 +54,8 @@ public class TaskServiceTests
     public async Task CreateAsync_TaskStaysWaiting_WhenNoUsersExist()
     {
         var db = GetInMemoryContext();
-        var service = new TaskService(db, GetMockUserService([]));
+        var logger = GetMockLogger<TaskService>();
+        var service = new TaskService(db, GetMockUserService([]), logger);
 
         var task = await service.CreateAsync(new CreateTaskDto { Title = "Task 2" });
 
@@ -80,8 +85,8 @@ public class TaskServiceTests
         );
 
         await db.SaveChangesAsync();
-
-        var service = new TaskService(db, GetMockUserService([user1, user2, user3]));
+        var logger = GetMockLogger<TaskService>();
+        var service = new TaskService(db, GetMockUserService([user1, user2, user3]), logger);
 
         // Act
         await service.ReassignTasksAsync();

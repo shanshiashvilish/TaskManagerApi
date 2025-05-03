@@ -6,7 +6,7 @@ using TaskManagerApi.Services.Abstractions;
 
 namespace TaskManagerApi.Services;
 
-public class UserService(AppDbContext dbContext) : IUserService
+public class UserService(AppDbContext dbContext, ILogger<UserService> logger) : IUserService
 {
     public async Task<User> CreateAsync(CreateUserDto dto)
     {
@@ -21,6 +21,7 @@ public class UserService(AppDbContext dbContext) : IUserService
 
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync();
+        logger.LogInformation("User '{UserName}' created with ID: {UserId}", user.Name, user.Id);
 
         return user;
     }

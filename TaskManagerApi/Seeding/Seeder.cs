@@ -4,7 +4,7 @@ using TaskManagerApi.Models;
 
 namespace TaskManagerApi.Seeding;
 
-public class Seeder(AppDbContext db)
+public class Seeder(AppDbContext db, ILogger<Seeder> logger)
 {
     private List<User> _users = [];
     private List<TaskItem> _tasks = [];
@@ -13,6 +13,8 @@ public class Seeder(AppDbContext db)
     {
         AddUsers();
         AddTasks();
+
+        logger.LogInformation("Seeding {UsersCount} users and {TasksCount} tasks.", _users.Count, _tasks.Count);
 
         db.SaveChanges();
     }
