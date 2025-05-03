@@ -7,37 +7,27 @@ using TaskManagerApi.Services.Abstractions;
 
 namespace TaskManagerApi.Services;
 
-public class TaskService(AppDbContext dbContext) : ITaskService
+public class TaskService(AppDbContext dbContext, IUserService userService) : ITaskService
 {
-    public Task ReassignTasksAsync()
-    {
-        throw new NotImplementedException();
-    }
-
     public async Task<TaskItem> CreateAsync(CreateTaskDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Title))
-            throw new ArgumentException("Title is required!");
-
-        var exists = await dbContext.Tasks.AnyAsync(t => t.Title == dto.Title);
-        if (exists)
-            throw new InvalidOperationException("Task with this title already exists!");
+        await ValidateTitle(dto.Title);
 
         var allUsers = await dbContext.Users.ToListAsync();
+
         var task = new TaskItem
         {
             Title = dto.Title,
             State = TaskState.Waiting
         };
 
-        if (allUsers.Count != 0)
+        if (allUsers.Count > 0)
         {
             var chosenUserId = await GetUserIdForNewTaskAsync(allUsers);
 
             if (chosenUserId != Guid.Empty)
             {
-                task.AssignedUserId = chosenUserId;
-                task.State = TaskState.InProgress;
+                AssignTask(task, chosenUserId);
             }
         }
 
@@ -47,6 +37,48 @@ public class TaskService(AppDbContext dbContext) : ITaskService
         return task;
     }
 
+    public async Task ReassignTasksAsync()
+    {
+        var tasks = (await GetAllAsync()).Where(t => t.State != TaskState.Completed);
+        var allUsers = await userService.GetAllAsync();
+
+        foreach (var task in tasks)
+        {
+            var history = await dbContext.TaskTransferHistories
+                .Where(h => h.TaskId == task.Id)
+                .OrderByDescending(h => h.TransferredAt)
+                .ToListAsync();
+
+            var currentUserId = task.AssignedUserId;
+            var previousUserId = history.Skip(1).FirstOrDefault()?.UserId;
+
+            var pastUserIds = history.Select(h => h.UserId).Distinct().ToList();
+            var allUserIds = allUsers.Select(u => u.Id).ToList();
+
+            var assignedToAll = allUserIds.All(id => pastUserIds.Contains(id));
+            if (assignedToAll)
+            {
+                UnassignTask(task, TaskState.Completed);
+                continue;
+            }
+
+            var eligibleUsers = allUsers
+                .Where(u => u.Id != currentUserId && u.Id != previousUserId)
+                .ToList();
+
+            if (eligibleUsers.Count == 0)
+            {
+                UnassignTask(task, TaskState.Waiting);
+                continue;
+            }
+
+            var newUser = eligibleUsers.OrderBy(_ => Guid.NewGuid()).First();
+            AssignTask(task, newUser.Id);
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
     public async Task<List<TaskItem>> GetAllAsync()
     {
         return await dbContext.Tasks
@@ -54,12 +86,59 @@ public class TaskService(AppDbContext dbContext) : ITaskService
             .ToListAsync();
     }
 
+    public async Task<List<TaskTransferHistoryDto>> GetTaskHistoryAsync(Guid taskId)
+    {
+        var history = await dbContext.TaskTransferHistories
+            .Where(h => h.TaskId == taskId)
+            .OrderBy(h => h.TransferredAt)
+            .Join(
+                dbContext.Users,
+                h => h.UserId,
+                u => u.Id,
+                (h, u) => new TaskTransferHistoryDto()
+                {
+                    UserId = u.Id,
+                    UserName = u.Name,
+                    TransferredAt = h.TransferredAt
+                }
+            )
+            .ToListAsync();
+
+        return history;
+    }
 
     #region Private Methods
 
+    private async Task ValidateTitle(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            throw new ArgumentException("Title is required!");
+
+        var exists = await dbContext.Tasks.AnyAsync(t => t.Title == title);
+        if (exists)
+            throw new InvalidOperationException("Task with this title already exists!");
+    }
+
+    private void AssignTask(TaskItem task, Guid userId)
+    {
+        task.AssignedUserId = userId;
+        task.State = TaskState.InProgress;
+
+        dbContext.TaskTransferHistories.Add(new TaskTransferHistory
+        {
+            TaskId = task.Id,
+            UserId = userId
+        });
+    }
+
+    private static void UnassignTask(TaskItem task, TaskState state)
+    {
+        task.AssignedUserId = null;
+        task.State = state;
+    }
+
     private async Task<Guid> GetUserIdForNewTaskAsync(List<User> allUsers)
     {
-        // Group task count by user ID
         var taskCountsByUsers = await dbContext.Tasks
             .Where(t => t.AssignedUserId != null)
             .GroupBy(t => t.AssignedUserId)
@@ -70,16 +149,14 @@ public class TaskService(AppDbContext dbContext) : ITaskService
             })
             .ToListAsync();
 
-        // Dictionary for quick access
         var taskCountLookup = taskCountsByUsers.ToDictionary(t => t.UserId, t => t.Count);
 
-        // Find users with 0 tasks
         var usersWithZeroTasks = allUsers
             .Where(u => !taskCountLookup.ContainsKey(u.Id))
             .ToList();
 
         return usersWithZeroTasks.Count > 0
-            ? usersWithZeroTasks.OrderBy(_ => Guid.NewGuid()).First().Id // Pick random from users with zero tasks
+            ? usersWithZeroTasks.OrderBy(_ => Guid.NewGuid()).First().Id
             : Guid.Empty;
     }
 

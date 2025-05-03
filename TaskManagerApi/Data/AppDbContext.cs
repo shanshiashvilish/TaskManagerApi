@@ -7,6 +7,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
+    public DbSet<TaskTransferHistory> TaskTransferHistories => Set<TaskTransferHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -17,5 +18,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<TaskItem>()
             .HasIndex(t => t.Title)
             .IsUnique();
+
+        modelBuilder.Entity<TaskTransferHistory>()
+            .HasIndex(h => new { h.TaskId, h.UserId })
+            .IsUnique(false);
     }
 }

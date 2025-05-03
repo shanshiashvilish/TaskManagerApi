@@ -22,6 +22,13 @@ public class TasksController(ITaskService taskService) : ControllerBase
         }
     }
 
+    [HttpGet("{id:guid}/history")]
+    public async Task<IActionResult> GetTaskHistory([FromRoute] Guid id)
+    {
+        var history = await taskService.GetTaskHistoryAsync(id);
+        return Ok(history);
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAllAsync()
     {
