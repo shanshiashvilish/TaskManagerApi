@@ -11,13 +11,25 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<User>()
-            .HasIndex(u => u.Id)
-            .IsUnique();
+        base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<TaskItem>()
-            .HasIndex(t => t.Title)
-            .IsUnique();
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(u => u.Id);
+            entity.HasIndex(u => u.Name).IsUnique();
+            entity.Property(u => u.Name).IsRequired();
+        });
+
+        modelBuilder.Entity<TaskItem>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.HasIndex(t => t.Title).IsUnique();
+            entity.Property(t => t.Title).IsRequired();
+            entity.HasOne(t => t.AssignedUser)
+                .WithMany(u => u.Tasks)
+                .HasForeignKey(t => t.AssignedUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
 
         modelBuilder.Entity<TaskTransferHistory>()
             .HasIndex(h => new { h.TaskId, h.UserId })

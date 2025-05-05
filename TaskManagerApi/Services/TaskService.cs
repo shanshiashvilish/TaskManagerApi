@@ -36,7 +36,7 @@ public class TaskService(AppDbContext dbContext, IUserService userService, ILogg
         await dbContext.SaveChangesAsync();
 
         logger.LogInformation("Task '{Title}' created with ID: {TaskId}", dto.Title, task.Id);
-        
+
         return task;
     }
 
@@ -67,7 +67,7 @@ public class TaskService(AppDbContext dbContext, IUserService userService, ILogg
             }
 
             var eligibleUsers = allUsers
-                .Where(u => u.Id != currentUserId && u.Id != previousUserId)
+                .Where(u => u.Id != currentUserId && u.Id != previousUserId && !pastUserIds.Contains(u.Id))
                 .ToList();
 
             if (eligibleUsers.Count == 0)
@@ -141,6 +141,9 @@ public class TaskService(AppDbContext dbContext, IUserService userService, ILogg
     {
         task.AssignedUserId = null;
         task.State = state;
+
+        if (state == TaskState.Completed)
+            task.CompletedAt = DateTime.UtcNow;
     }
 
     private async Task<Guid> GetUserIdForNewTaskAsync(List<User> allUsers)
