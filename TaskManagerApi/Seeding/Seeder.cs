@@ -48,25 +48,39 @@ public class Seeder(AppDbContext db, ILogger<Seeder> logger)
 
         _tasks =
         [
-            new TaskItem { Title = "Write tests", State = TaskState.InProgress },
-            new TaskItem { Title = "Document endpoints", State = TaskState.InProgress },
-            new TaskItem { Title = "Update projects", State = TaskState.InProgress },
-            new TaskItem { Title = "Delete unused files", State = TaskState.InProgress },
-            new TaskItem { Title = "Clean up models", State = TaskState.InProgress }
+            new TaskItem { Title = "Write tests", State = TaskState.Waiting },
+            new TaskItem { Title = "Document endpoints", State = TaskState.Waiting },
+            new TaskItem { Title = "Update projects", State = TaskState.Waiting },
+            new TaskItem { Title = "Delete unused files", State = TaskState.Waiting },
+            new TaskItem { Title = "Clean up models", State = TaskState.Waiting }
         ];
 
-        // Assign a random user to each task
+        // Try to assign to users with zero assigned tasks
+        var userTaskCounts = new Dictionary<Guid, int>();
+        foreach (var user in _users)
+            userTaskCounts[user.Id] = 0;
+
         foreach (var task in _tasks)
         {
-            var user = _users.OrderBy(_ => Guid.NewGuid()).First();
-            task.AssignedUserId = user.Id;
+            var eligibleUsers = _users
+                .Where(u => userTaskCounts[u.Id] == 0)
+                .ToList();
+
+            if (eligibleUsers.Count == 0)
+                continue;
+
+            var chosenUser = eligibleUsers.OrderBy(_ => Guid.NewGuid()).First();
+            task.AssignedUserId = chosenUser.Id;
+            task.State = TaskState.InProgress;
+            userTaskCounts[chosenUser.Id]++;
 
             db.TaskTransferHistories.Add(new TaskTransferHistory
             {
                 TaskId = task.Id,
-                UserId = user.Id,
+                UserId = chosenUser.Id,
                 TransferredAt = DateTime.UtcNow
             });
+            // Else leave task in Waiting state
         }
 
         db.Tasks.AddRange(_tasks);
