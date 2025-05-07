@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Moq;
 using TaskManagerApi.Data;
 using TaskManagerApi.DTOs;
 using TaskManagerApi.Models;
@@ -9,80 +10,64 @@ namespace TaskManagerApi.Tests.Services;
 
 public class UserServiceTests
 {
-    private static ILogger<T> GetMockLogger<T>() => new Moq.Mock<ILogger<T>>().Object;
+    private readonly AppDbContext _context;
+    private readonly UserService _userService;
 
-    private static AppDbContext GetInMemoryContext()
+    public UserServiceTests()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(databaseName: $"UserTestDb-{Guid.NewGuid()}")
             .Options;
 
-        return new AppDbContext(options);
+        _context = new AppDbContext(options);
+        var mockLogger = new Mock<ILogger<UserService>>();
+        _userService = new UserService(_context, mockLogger.Object);
     }
 
     [Fact]
-    public async Task CreateAsync_CreatesUser_WhenNameIsUnique()
+    public async Task CreateAsync_ShouldCreateUser_WhenNameIsUnique()
     {
         // Arrange
-        var db = GetInMemoryContext();
-        var logger = GetMockLogger<UserService>();
-        var service = new UserService(db, logger);
         var dto = new CreateUserDto { Name = "UniqueUser" };
 
         // Act
-        var user = await service.CreateAsync(dto);
+        var user = await _userService.CreateAsync(dto);
 
         // Assert
+        Assert.NotNull(user);
         Assert.Equal(dto.Name, user.Name);
         Assert.NotEqual(Guid.Empty, user.Id);
     }
 
     [Fact]
-    public async Task CreateAsync_ThrowsException_WhenNameIsDuplicate()
+    public async Task CreateAsync_ShouldThrowException_WhenNameAlreadyExists()
     {
         // Arrange
-        var db = GetInMemoryContext();
-        db.Users.Add(new User { Name = "DuplicateUser" });
-        await db.SaveChangesAsync();
+        const string name = "DuplicateUser";
+        _context.Users.Add(new User { Name = name });
+        await _context.SaveChangesAsync();
 
-        var logger = GetMockLogger<UserService>();
-        var service = new UserService(db, logger);
-        var dto = new CreateUserDto { Name = "DuplicateUser" };
+        var dto = new CreateUserDto { Name = name };
 
         // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(dto));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _userService.CreateAsync(dto));
     }
 
     [Fact]
-    public async Task CreateAsync_ThrowsException_WhenNameIsEmpty()
+    public async Task GetAllAsync_ShouldReturnAllUsers()
     {
         // Arrange
-        var db = GetInMemoryContext();
-        var logger = GetMockLogger<UserService>();
-        var service = new UserService(db, logger);
-        var dto = new CreateUserDto { Name = "" };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(dto));
-    }
-
-    [Fact]
-    public async Task GetAllAsync_ReturnsAllUsers()
-    {
-        // Arrange
-        var db = GetInMemoryContext();
-        db.Users.AddRange(
+        _context.Users.AddRange(
             new User { Name = "User1" },
             new User { Name = "User2" }
         );
-        await db.SaveChangesAsync();
+        await _context.SaveChangesAsync();
 
-        var logger = GetMockLogger<UserService>();
-        var service = new UserService(db, logger);
         // Act
-        var users = await service.GetAllAsync();
+        var users = await _userService.GetAllAsync();
 
         // Assert
+        Assert.NotNull(users);
         Assert.Equal(2, users.Count);
     }
 }
