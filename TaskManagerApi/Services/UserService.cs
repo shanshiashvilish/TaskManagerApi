@@ -28,6 +28,7 @@ public class UserService(AppDbContext dbContext, ILogger<UserService> logger) : 
 
     public async Task<List<User>> GetAllAsync()
     {
-        return await dbContext.Users.ToListAsync();
+        return await dbContext.Users.Include(u => u.Tasks)
+            .ToListAsync();
     }
 }
