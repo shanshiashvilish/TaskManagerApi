@@ -133,7 +133,8 @@ public class TaskService(AppDbContext dbContext, IUserService userService, ILogg
         dbContext.TaskTransferHistories.Add(new TaskTransferHistory
         {
             TaskId = task.Id,
-            UserId = userId
+            UserId = userId,
+            TransferredAt = DateTime.UtcNow
         });
     }
 
