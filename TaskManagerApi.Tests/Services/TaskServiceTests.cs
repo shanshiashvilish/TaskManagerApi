@@ -34,8 +34,11 @@ public class TaskServiceTests
     {
         // Arrange
         var dto = new CreateTaskDto { Title = "New Task" };
-        _context.Users.Add(new User { Id = Guid.NewGuid(), Name = "TestUser" });
+        var user = new User { Id = Guid.NewGuid(), Name = "TestUser" };
+        _context.Users.Add(user);
         await _context.SaveChangesAsync();
+
+        _mockUserService.Setup(s => s.GetAllAsync()).ReturnsAsync([user]);
 
         // Act
         var task = await _taskService.CreateAsync(dto);
@@ -45,6 +48,22 @@ public class TaskServiceTests
         Assert.Equal(TaskState.InProgress, task.State);
         Assert.Equal(dto.Title, task.Title);
         Assert.NotNull(task.AssignedUserId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ShouldCreateTaskInWaitingState_WhenNoUsersExist()
+    {
+        // Arrange
+        var dto = new CreateTaskDto { Title = "Waiting Task" };
+        _mockUserService.Setup(s => s.GetAllAsync()).ReturnsAsync([]);
+
+        // Act
+        var task = await _taskService.CreateAsync(dto);
+
+        // Assert
+        Assert.NotNull(task);
+        Assert.Equal(TaskState.Waiting, task.State);
+        Assert.Null(task.AssignedUserId);
     }
 
     [Fact]
@@ -77,7 +96,7 @@ public class TaskServiceTests
         );
         await _context.SaveChangesAsync();
 
-        _mockUserService.Setup(s => s.GetAllAsync()).ReturnsAsync(new List<User> { user1, user2 });
+        _mockUserService.Setup(s => s.GetAllAsync()).ReturnsAsync([user1, user2]);
 
         // Act
         await _taskService.ReassignTasksAsync();
@@ -86,5 +105,31 @@ public class TaskServiceTests
         var updatedTask = await _context.Tasks.FindAsync(task.Id);
         Assert.Equal(TaskState.Completed, updatedTask.State);
         Assert.Null(updatedTask.AssignedUserId);
+    }
+
+    [Fact]
+    public async Task ReassignTasksAsync_ShouldAssignNewUser_WhenOnlyOneUserPreviouslyAssigned()
+    {
+        // Arrange
+        var user1 = new User { Id = Guid.NewGuid(), Name = "User1" };
+        var user2 = new User { Id = Guid.NewGuid(), Name = "User2" };
+        await _context.Users.AddRangeAsync(user1, user2);
+        await _context.SaveChangesAsync();
+
+        var task = new TaskItem { Title = "Task2", AssignedUserId = user1.Id, State = TaskState.InProgress };
+        await _context.Tasks.AddAsync(task);
+
+        await _context.TaskTransferHistories.AddAsync(new TaskTransferHistory { TaskId = task.Id, UserId = user1.Id });
+        await _context.SaveChangesAsync();
+
+        _mockUserService.Setup(s => s.GetAllAsync()).ReturnsAsync([user1, user2]);
+
+        // Act
+        await _taskService.ReassignTasksAsync();
+
+        // Assert
+        var updatedTask = await _context.Tasks.FindAsync(task.Id);
+        Assert.Equal(TaskState.InProgress, updatedTask.State);
+        Assert.Equal(user2.Id, updatedTask.AssignedUserId);
     }
 }

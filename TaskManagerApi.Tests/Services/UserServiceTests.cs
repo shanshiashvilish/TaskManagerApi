@@ -70,4 +70,15 @@ public class UserServiceTests
         Assert.NotNull(users);
         Assert.Equal(2, users.Count);
     }
+
+    [Fact]
+    public async Task GetAllAsync_ShouldReturnEmptyList_WhenNoUsersExist()
+    {
+        // Act
+        var users = await _userService.GetAllAsync();
+
+        // Assert
+        Assert.NotNull(users);
+        Assert.Empty(users);
+    }
 }
